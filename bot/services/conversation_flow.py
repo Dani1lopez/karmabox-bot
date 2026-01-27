@@ -4,6 +4,7 @@ from typing import Literal
 from bot.schemas.lead import LeadCreate
 from bot.services.sheets_service import save_lead, DuplicateLeadError
 from bot.utils.phone import validate_phone_es
+from bot.services.ai_client import ai_reply
 
 Step = Literal["name","last_name","phone","address","confirm"]
 
@@ -16,6 +17,12 @@ class Session:
 
 _sessions: dict[str, Session] = {}
 
+def has_session(user_id: str) -> bool:
+    return user_id in _sessions
+
+def clear_session(user_id: str) -> None:
+    _sessions.pop(user_id, None)
+
 def reset_session(user_id: str) -> Session:
     s = Session()
     _sessions[user_id] = s
@@ -23,6 +30,7 @@ def reset_session(user_id: str) -> Session:
 
 def get_session(user_id: str) -> Session:
     return _sessions.get(user_id) or reset_session(user_id)
+
 
 def handle_message(user_id: str, text: str) -> str:
     text = (text or "").strip()
@@ -33,8 +41,12 @@ def handle_message(user_id: str, text: str) -> str:
         return "¡Vamos! 👇\nDime tu *nombre*."
     
     if text.lower() in {"/cancel", "cancel"}:
-        reset_session(user_id)
+        clear_session(user_id)
         return "Cancelado ✅. Si quieres empezar otra vez: /start"
+    
+    #Si no hay session entonces IA
+    if not has_session(user_id):
+        return ai_reply(text)
     
     s = get_session(user_id)
     
