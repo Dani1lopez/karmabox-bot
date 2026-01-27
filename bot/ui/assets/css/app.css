@@ -82,6 +82,17 @@ body {
     letter-spacing: .2px;
 }
 
+.table-wrap{
+overflow-x: auto;
+overflow-y: hidden;
+-webkit-overflow-scrolling: touch;
+}
+
+
+.table{
+min-width: 900px; /* fuerza ancho mínimo y permite scroll */
+}
+
 .brand-text p {
     margin: 0;
     font-size: 12px;
