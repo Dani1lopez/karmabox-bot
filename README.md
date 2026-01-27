@@ -626,7 +626,7 @@ Proyecto desarrollado como prueba técnica. Consultar con el autor para uso come
 
 ## 👥 Autor
 
-Desarrollado por **[Tu Nombre]** como parte de proceso de selección.
+Desarrollado por **[Daniel Alcaraz López]** como parte de proceso de selección.
 
 - GitHub: [@tu-usuario](https://github.com/tu-usuario)
 - LinkedIn: [tu-perfil](https://linkedin.com/in/tu-perfil)
