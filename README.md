@@ -63,8 +63,8 @@ karmabox-bot/
 ├── .env.example               # Template de variables de entorno
 ├── .gitignore                 # Exclusiones (secrets, venv, .env)
 ├── sheets_test.py             # Script de prueba para Google Sheets
-├── secrets/
-│   └── service_account.json   # Credenciales GCP (NO subir a Git)
+├── secrets/                   # ⚠️ DIRECTORIO LOCAL, NO VERSIONADO
+│   └── service_account.json   # (debes crearlo tú, NO existe en el repo)
 └── bot/
     ├── __init__.py
     ├── app.py                 # Configuración app (placeholder)
@@ -329,6 +329,12 @@ curl -X PATCH http://localhost:8000/leads/uuid-del-lead \
 
 ## 🖥️ UI Web
 
+> **⚠️ ADVERTENCIA DE SEGURIDAD:**
+>
+> **LA UI NO TIENE AUTENTICACIÓN.** Cualquier persona con acceso a la URL puede ver y editar leads.
+>
+> **NO EXPONER PÚBLICAMENTE SIN PROTECCIÓN** (proxy con auth, VPN, o implementar login).
+
 La interfaz web está servida automáticamente en:
 
 ```
@@ -468,20 +474,16 @@ El bot utiliza la API de Groq para responder preguntas cuando el usuario no est�
 
 #### Gestión del `service_account.json`
 
-**Opción A: Variable de entorno (Base64)**
-
-1. Codifica el JSON:
-   ```bash
-   base64 -i secrets/service_account.json
-   ```
-2. En Render, crea variable `GOOGLE_SERVICE_ACCOUNT_JSON` con el output
-3. Modifica `sheets_service.py` para leer de env (requiere cambio de código - fuera del scope de este README)
-
-**Opción B: Secret File (Render)**
+**Secret File (Render) — método recomendado:**
 
 1. En Render → Environment → Secret Files
 2. Añade archivo con path `/etc/secrets/service_account.json`
-3. Cambia `GOOGLE_SERVICE_ACCOUNT_FILE=/etc/secrets/service_account.json`
+3. Configura la variable de entorno:
+   ```
+   GOOGLE_SERVICE_ACCOUNT_FILE=/etc/secrets/service_account.json
+   ```
+
+> **Nota:** Esta es la forma más limpia ya que el proyecto ya soporta la variable `GOOGLE_SERVICE_ACCOUNT_FILE`.
 
 ### Opción 2: Railway.app
 
@@ -523,9 +525,21 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-app.render.c
 - Escape HTML en frontend para prevenir XSS
 - Validación opcional de firma HMAC en webhook WhatsApp
 
+### ⚠️ IMPORTANTE: UI sin autenticación
+
+> **La interfaz web (`/ui/`) no tiene sistema de login.**
+>
+> Si despliegas este proyecto en un servidor público, **cualquier persona podrá ver y modificar leads**.
+>
+> **Antes de exponer públicamente**, implementa una de estas protecciones:
+>
+> - Proxy reverso con autenticación (nginx + htpasswd)
+> - Acceso solo via VPN
+> - Implementar sistema de login en la aplicación
+
 ### 📋 Recomendaciones adicionales
 
-- [ ] Añadir autenticación a la UI (actualmente es pública)
+- [ ] **Añadir autenticación a la UI (CRÍTICO si se despliega público)**
 - [ ] Implementar rate limiting en endpoints
 - [ ] Usar HTTPS en producción
 - [ ] Logging estructurado con niveles
@@ -628,5 +642,5 @@ Proyecto desarrollado como prueba técnica. Consultar con el autor para uso come
 
 Desarrollado por **[Daniel Alcaraz López]** como parte de proceso de selección.
 
-- GitHub: [@tu-usuario](https://github.com/tu-usuario)
-- LinkedIn: [tu-perfil](https://linkedin.com/in/tu-perfil)
+- GitHub: [@Dani1lopez](https://github.com/Dani1lopez)
+- LinkedIn: [Dani Alcaraz López](www.linkedin.com/in/dani-alcaraz-lópez-774aa8251)
