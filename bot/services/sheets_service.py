@@ -1,22 +1,23 @@
 # bot/services/sheets_service.py
 
+import os
+from functools import lru_cache
 from uuid import uuid4
 from datetime import datetime, timezone
 import gspread
 
 from bot.schemas.lead import LeadCreate, LeadOut
-from bot.utils import phone
 from bot.utils.phone import normalize_phone
 from bot.utils.lead_mapper import normalize_lead_record
 
+SHEET_NAME = os.getenv("SHEET_NAME", "KarmaBox Leads")
+SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "secrets/service_account.json")
 
-SHEET_NAME = "KarmaBox Leads"
-SERVICE_ACCOUNT_FILE = "secrets/service_account.json"
-
-# Conectamos una vez al arrancar/importar el módulo (simple para demo)
-gc = gspread.service_account(filename=SERVICE_ACCOUNT_FILE)
-sh = gc.open(SHEET_NAME)
-ws = sh.sheet1
+@lru_cache
+def _get_ws():
+    gc = gspread.service_account(filename=SERVICE_ACCOUNT_FILE)
+    sh = gc.open(SHEET_NAME)
+    return sh.sheet1
 
 
 class DuplicateLeadError(Exception):
@@ -31,7 +32,7 @@ class DuplicatePhoneError(Exception):
 
 
 def list_leads() -> list[dict]:
-    records = ws.get_all_records()
+    records = _get_ws().get_all_records()
     out: list[dict] = []
     
     for r in records:
@@ -43,7 +44,7 @@ def list_leads() -> list[dict]:
 
 
 def save_lead(payload: LeadCreate) -> LeadOut:
-    rows = ws.get_all_records()
+    rows = _get_ws().get_all_records()
     if any(normalize_phone(r.get("phone", "")) == payload.phone for r in rows):
         raise DuplicateLeadError("Ya existe un lead con ese teléfono.")
 
@@ -53,7 +54,7 @@ def save_lead(payload: LeadCreate) -> LeadOut:
         **payload.model_dump(),
     )
 
-    ws.append_row([
+    _get_ws().append_row([
         lead.id,
         lead.created_at,
         lead.name,
@@ -71,7 +72,7 @@ def update_lead_by_id(lead_id: str, updates: dict) -> dict:
     - Valida duplicado de phone si se actualiza
     - Devuelve el lead actualizado como dict
     """
-    values = ws.get_all_values()
+    values = _get_ws().get_all_values()
     if not values or len(values) < 2:
         raise LeadNotFoundError("No hay datos")
     
@@ -115,8 +116,8 @@ def update_lead_by_id(lead_id: str, updates: dict) -> dict:
             continue
         
         col_idx = headers.index(field) + 1 #gspread es 1-based
-        ws.update_cell(target_row, col_idx, str(value))
+        _get_ws().update_cell(target_row, col_idx, str(value))
     #devolver fila actualizada como dict
-    updated_row = ws.row_values(target_row)
+    updated_row = _get_ws().row_values(target_row)
     raw = {headers[i]: (updated_row[i] if i < len(updated_row) else "") for i in range(len(headers))}
     return normalize_lead_record(raw)
