@@ -1,0 +1,62 @@
+# -------------------------
+# Python / FastAPI
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Caches / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+coverage/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# -------------------------
+# Environment variables
+# -------------------------
+.env
+.env.*
+!.env.example
+
+# -------------------------
+# Secrets / credentials
+# -------------------------
+secrets/
+!secrets/.gitkeep
+**/service_account*.json
+**/*service-account*.json
+
+# -------------------------
+# OS / Editor
+# -------------------------
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+*.iml
+
+# -------------------------
+# Ngrok
+# -------------------------
+.ngrok2/
+ngrok.yml
