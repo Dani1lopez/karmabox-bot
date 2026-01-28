@@ -131,8 +131,8 @@ async def mark_whatsapp_read(message_id: str) -> None:
         await client.post(url, headers=headers, json=data)
 
 
-async def run_handle_message(sender_id: str, text: str) -> Optional[str]:
-    res: Any = handle_message(sender_id, text)  # str o coroutine
+async def run_handle_message(sender_id: str, text: str, source: str) -> Optional[str]:
+    res: Any = handle_message(sender_id, text, source=source)  # str o coroutine
     if inspect.isawaitable(res):
         res = await res
     if res is None:
@@ -199,7 +199,7 @@ async def whatsapp_webhook(request: Request):
             logger.info("WA non-text handled (%s). from=%s id=%s", detected, wa_from, msg_id)
             continue
 
-        reply = await run_handle_message(wa_from, user_text)
+        reply = await run_handle_message(wa_from, user_text, source="whatsapp")
         if reply:
             await send_whatsapp_text(wa_from, reply)
 

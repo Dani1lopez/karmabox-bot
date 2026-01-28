@@ -9,8 +9,8 @@ from bot.services.conversation_flow import handle_message
 router = APIRouter()
 
 
-async def run_handle_message(sender_id: str, text: str) -> Optional[str]:
-    res: Any = handle_message(sender_id, text)
+async def run_handle_message(sender_id: str, text: str, source: str) -> Optional[str]:
+    res: Any = handle_message(sender_id, text, source=source)
     if inspect.isawaitable(res):
         res = await res
     if res is None:
@@ -31,7 +31,7 @@ async def telegram_webhook(request: Request):
     if not chat_id or not text:
         return {"ok": True}
 
-    reply = await run_handle_message(str(chat_id), text)
+    reply = await run_handle_message(str(chat_id), text, source="telegram")
 
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     if not telegram_token:

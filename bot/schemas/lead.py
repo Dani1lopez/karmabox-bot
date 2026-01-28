@@ -10,6 +10,7 @@ class LeadCreate(BaseModel):
     last_name: str
     phone: str
     address: str
+    source: Optional[str] = None
 
     @field_validator("phone")
     @classmethod

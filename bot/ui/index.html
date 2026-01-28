@@ -60,6 +60,15 @@
                             <option value="50">50</option>
                         </select>
                     </label>
+
+                    <label class="field">
+                        <span>Canal</span>
+                        <select id="sourceFilter">
+                            <option value="all" selected>Todos</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="telegram">Telegram</option>
+                        </select>
+                    </label>
                 </div>
 
                 <div class="meta">
@@ -74,6 +83,7 @@
                         <tr>
                             <th>Lead</th>
                             <th>Teléfono</th>
+                            <th>Canal</th>
                             <th>Dirección</th>
                             <th>Alta</th>
                             <th class="th-actions">Acciones</th>
@@ -144,6 +154,10 @@
                 <div class="kv">
                     <div class="k">Dirección</div>
                     <div class="v" id="d_address">—</div>
+                </div>
+                <div class="kv">
+                    <div class="k">Canal</div>
+                    <div class="v" id="d_source">—</div>
                 </div>
 
                 <div class="side-actions">

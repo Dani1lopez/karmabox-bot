@@ -1,329 +1,301 @@
 # 📦 KarmaBox Bot
 
-> **Backend FastAPI para captación de leads con integración a Google Sheets, bot Telegram y UI web de gestión.**
+> **Sistema de captación de leads multicanal con FastAPI, Google Sheets, bots Telegram/WhatsApp y UI de gestión.**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?logo=fastapi&logoColor=white)
 ![Google Sheets](https://img.shields.io/badge/Google%20Sheets-Integration-34A853?logo=google-sheets&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram&logoColor=white)
+![WhatsApp](https://img.shields.io/badge/WhatsApp-Cloud%20API-25D366?logo=whatsapp&logoColor=white)
 
 ---
 
-## 📋 Resumen
+## 📋 Descripción del Proyecto
 
-**KarmaBox** es un proyecto de prueba técnica que implementa un sistema de captación y gestión de leads mediante:
+**KarmaBox Bot** es una prueba técnica que implementa un sistema completo de captación y gestión de leads mediante múltiples canales:
 
-- **API REST** (FastAPI) con endpoints para crear, listar y actualizar leads
-- **Persistencia en Google Sheets** como base de datos (sin necesidad de servidor de BD)
-- **Bot conversacional Telegram** con flujo guiado para registrar leads paso a paso
-- **IA opcional (Groq)** para responder preguntas cuando el usuario no está en flujo de registro
-- **UI web** para visualizar, filtrar, buscar y editar leads
-- **Webhook WhatsApp** (preparado pero bloqueado por limitaciones de Meta)
+### Requisitos de la Prueba
 
----
+- **API REST** con validación y deduplicación
+- **Persistencia sin servidor de BD** (Google Sheets como backend)
+- **Bot conversacional** con flujo guiado paso a paso
+- **Soporte multicanal**: Telegram y WhatsApp Cloud API
+- **UI web** para visualización y edición de leads
+- **IA opcional** para respuestas fuera del flujo de registro
 
-## ✨ Features
+### ¿Qué hace el proyecto?
 
-| Feature              | Estado        | Descripción                                            |
-| -------------------- | ------------- | ------------------------------------------------------ |
-| ✅ API REST `/leads` | **Funcional** | CRUD de leads con validación de teléfono ES            |
-| ✅ Google Sheets     | **Funcional** | Almacenamiento persistente vía Service Account         |
-| ✅ Bot Telegram      | **Funcional** | Flujo conversacional completo para registro            |
-| ✅ UI Web            | **Funcional** | Dashboard para ver/editar leads                        |
-| ⚠️ IA Groq           | **Opcional**  | Respuestas inteligentes si se configura `GROQ_API_KEY` |
-| ❌ WhatsApp          | **Bloqueado** | Rate limiting de Meta (cuenta nueva/sandbox)           |
+| Componente        | Funcionalidad                                                             |
+| ----------------- | ------------------------------------------------------------------------- |
+| **API REST**      | CRUD de leads con validación teléfono ES, deduplicación (409 Conflict)    |
+| **Google Sheets** | Almacenamiento persistente via Service Account                            |
+| **Bot Telegram**  | Webhook con flujo conversacional: `/start`, `/cancel`, confirmación       |
+| **Bot WhatsApp**  | Webhook verificado, recibe/responde mensajes, idempotencia por message_id |
+| **UI Web**        | Listado, búsqueda, filtro por source, ordenación, paginación, edición     |
+| **IA Groq**       | Respuestas inteligentes fuera del flujo de registro (opcional)            |
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-                    ┌─────────────────┐
-                    │   Telegram Bot  │
-                    │   (Webhook)     │
-                    └────────┬────────┘
-                             │
-                             ▼
-┌─────────────┐     ┌───────────────────┐     ┌─────────────────┐
-│   UI Web    │────▶│    FastAPI App    │────▶│  Google Sheets  │
-│  (browser)  │     │   main.py / bot/  │     │  (gspread)      │
-└─────────────┘     └───────────────────┘     └─────────────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │  Groq AI (opt.) │
-                    └─────────────────┘
+                    ┌─────────────────┐     ┌─────────────────┐
+                    │   Telegram Bot  │     │  WhatsApp Bot   │
+                    │   (Webhook)     │     │  (Cloud API)    │
+                    └────────┬────────┘     └────────┬────────┘
+                             │                       │
+                             └───────────┬───────────┘
+                                         ▼
+┌─────────────┐              ┌───────────────────┐              ┌─────────────────┐
+│   UI Web    │─────────────▶│    FastAPI App    │─────────────▶│  Google Sheets  │
+│  (/ui/)     │              │   main.py / bot/  │              │  (gspread)      │
+└─────────────┘              └───────────────────┘              └─────────────────┘
+                                         │
+                                         ▼
+                             ┌─────────────────┐
+                             │  Groq AI (opt.) │
+                             └─────────────────┘
 ```
 
 ### Estructura de Carpetas
 
 ```
 karmabox-bot/
-├── main.py                    # Punto de entrada FastAPI
+├── main.py                    # Punto de entrada FastAPI (monta /ui/, redirige / → /ui/)
+├── requirements.txt           # Dependencias del proyecto
 ├── .env.example               # Template de variables de entorno
 ├── .gitignore                 # Exclusiones (secrets, venv, .env)
-├── sheets_test.py             # Script de prueba para Google Sheets
-├── secrets/                   # ⚠️ DIRECTORIO LOCAL, NO VERSIONADO
-│   └── service_account.json   # (debes crearlo tú, NO existe en el repo)
+├── secrets/                   # ⚠️ LOCAL, NO VERSIONADO
+│   └── service_account.json   # Credenciales Google (crear manualmente)
 └── bot/
-    ├── __init__.py
-    ├── app.py                 # Configuración app (placeholder)
     ├── routers/
-    │   ├── __init__.py
-    │   ├── leads.py           # Endpoints: /health, /leads (GET/POST/PATCH)
+    │   ├── leads.py               # GET /health, POST /leads, GET /leads, PATCH /leads/{id}
     │   ├── telegram_webhook.py    # POST /webhook/telegram
     │   └── whatsapp_webhook.py    # GET/POST /webhook/whatsapp
     ├── schemas/
-    │   ├── __init__.py
-    │   └── lead.py            # Pydantic models: LeadCreate, LeadOut, LeadUpdate
+    │   └── lead.py                # LeadCreate, LeadOut, LeadUpdate (Pydantic)
     ├── services/
-    │   ├── __init__.py
-    │   ├── sheets_service.py  # Conexión gspread + CRUD
+    │   ├── sheets_service.py      # CRUD Google Sheets + idempotencia WhatsApp
     │   ├── conversation_flow.py   # Máquina de estados del bot
-    │   └── ai_client.py       # Cliente Groq para IA opcional
+    │   └── ai_client.py           # Cliente Groq para IA
     ├── utils/
-    │   ├── __init__.py
-    │   ├── phone.py           # Validación teléfono España (9 dígitos)
-    │   └── lead_mapper.py     # Normalización de registros
+    │   ├── phone.py               # Validación teléfono España
+    │   └── lead_mapper.py         # Normalización de datos
     └── ui/
-        ├── index.html         # Dashboard HTML
+        ├── index.html             # Dashboard HTML
         └── assets/
             ├── css/app.css
-            └── js/app.js      # Lógica frontend (fetch API)
+            └── js/app.js          # Lógica frontend (fetch API)
 ```
-
----
-
-## 📌 Requisitos
-
-- **Python 3.10+**
-- **pip** (gestor de paquetes)
-- **Cuenta Google** con acceso a Google Cloud Console
-- **Bot Telegram** creado con [@BotFather](https://t.me/BotFather)
-- **(Opcional)** API Key de [Groq](https://groq.com/) para IA
-- **(Opcional)** Túnel HTTPS público (ngrok o similar) para webhooks
-
-### Dependencias principales (instaladas vía pip)
-
-| Paquete         | Uso                                         |
-| --------------- | ------------------------------------------- |
-| `fastapi`       | Framework web                               |
-| `uvicorn`       | Servidor ASGI                               |
-| `gspread`       | Cliente Google Sheets                       |
-| `httpx`         | Cliente HTTP async (Telegram/Groq/WhatsApp) |
-| `python-dotenv` | Carga de `.env`                             |
-| `pydantic`      | Validación de datos                         |
-
----
-
-## 🔧 Setup Google Sheets
-
-### 1. Crear proyecto en Google Cloud Console
-
-1. Ve a [console.cloud.google.com](https://console.cloud.google.com/)
-2. Crea un nuevo proyecto o selecciona uno existente
-3. Habilita la **Google Sheets API** y **Google Drive API**
-
-### 2. Crear Service Account
-
-1. Ve a **APIs & Services → Credentials**
-2. Click **Create Credentials → Service Account**
-3. Ponle un nombre (ej: `karmabox-sheets`)
-4. Click **Done** (no necesitas roles adicionales para Sheets)
-5. Entra en el Service Account creado → **Keys → Add Key → Create new key → JSON**
-6. Descarga el archivo y **renómbralo** a `service_account.json`
-7. Colócalo en `secrets/service_account.json`
-
-### 3. Crear el Google Sheet
-
-1. Ve a [sheets.google.com](https://sheets.google.com/)
-2. Crea un nuevo spreadsheet llamado exactamente: **`KarmaBox Leads`**
-3. En la primera fila (headers), escribe **exactamente** estas columnas:
-
-| A   | B          | C    | D         | E     | F       |
-| --- | ---------- | ---- | --------- | ----- | ------- |
-| id  | created_at | name | last_name | phone | address |
-
-4. **Importante**: Comparte el Sheet con el email del Service Account:
-   - Abre el JSON, busca el campo `"client_email"`
-   - Copia ese email (ej: `karmabox-sheets@proyecto.iam.gserviceaccount.com`)
-   - En el Sheet, click **Compartir** → pega el email → **Editor** → **Enviar**
-
----
-
-## 🔐 Variables de Entorno
-
-Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
-
-```bash
-# Copia el ejemplo
-cp .env.example .env
-```
-
-### Variables requeridas
-
-| Variable                      | Descripción                      | Ejemplo                                          |
-| ----------------------------- | -------------------------------- | ------------------------------------------------ |
-| `TELEGRAM_BOT_TOKEN`          | Token del bot de @BotFather      | `7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | Ruta al JSON del Service Account | `secrets/service_account.json`                   |
-| `SHEET_NAME`                  | Nombre exacto del Google Sheet   | `KarmaBox Leads`                                 |
-
-### Variables opcionales
-
-| Variable                   | Descripción                      | Por defecto               |
-| -------------------------- | -------------------------------- | ------------------------- |
-| `GROQ_API_KEY`             | API Key de Groq para IA          | (vacío = IA desactivada)  |
-| `AI_MODEL`                 | Modelo Groq a usar               | `llama-3.3-70b-versatile` |
-| `API_BASE_URL`             | URL pública (para webhooks)      | —                         |
-| `WHATSAPP_VERIFY_TOKEN`    | Token de verificación webhook WA | —                         |
-| `WHATSAPP_ACCESS_TOKEN`    | Token Cloud API de Meta          | —                         |
-| `WHATSAPP_PHONE_NUMBER_ID` | Phone Number ID de Meta          | —                         |
-| `WHATSAPP_WABA_ID`         | WhatsApp Business Account ID     | —                         |
-| `WHATSAPP_APP_SECRET`      | App Secret para validar firma    | —                         |
-
----
-
-## 🚀 Instalación y Ejecución Local
-
-### 1. Clonar el repositorio
-
-```bash
-git clone https://github.com/tu-usuario/karmabox-bot.git
-cd karmabox-bot
-```
-
-### 2. Crear entorno virtual
-
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# o en Windows: venv\Scripts\activate
-```
-
-### 3. Instalar dependencias
-
-```bash
-pip install fastapi uvicorn gspread httpx python-dotenv pydantic
-```
-
-### 4. Configurar variables de entorno
-
-```bash
-cp .env.example .env
-# Edita .env con tus valores reales
-```
-
-### 5. Colocar credenciales Google
-
-```bash
-# Coloca tu service_account.json en:
-secrets/service_account.json
-```
-
-### 6. Ejecutar el servidor
-
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-La API estará disponible en `http://localhost:8000`
 
 ---
 
 ## 📡 Endpoints
 
-### Health Check
+| Método  | Ruta                | Descripción                                   | Códigos                   |
+| ------- | ------------------- | --------------------------------------------- | ------------------------- |
+| `GET`   | `/health`           | Health check                                  | 200                       |
+| `POST`  | `/leads`            | Crear lead (con validación y deduplicación)   | 201, 409 (duplicado), 422 |
+| `GET`   | `/leads`            | Listar todos los leads                        | 200                       |
+| `PATCH` | `/leads/{lead_id}`  | Actualizar lead parcialmente                  | 200, 400, 404, 409        |
+| `POST`  | `/webhook/telegram` | Webhook Telegram                              | 200                       |
+| `GET`   | `/webhook/whatsapp` | Verificación webhook WhatsApp (hub.challenge) | 200, 403                  |
+| `POST`  | `/webhook/whatsapp` | Recepción mensajes WhatsApp                   | 200                       |
+
+### Schemas Pydantic
+
+**LeadCreate** (POST):
+
+```json
+{
+  "name": "string",
+  "last_name": "string",
+  "phone": "string", // 9 dígitos ES, empieza 6/7/8/9
+  "address": "string",
+  "source": "string" // opcional: "telegram" | "whatsapp"
+}
+```
+
+**LeadOut** (respuesta):
+
+```json
+{
+  "id": "uuid",
+  "created_at": "ISO8601",
+  "name": "string",
+  "last_name": "string",
+  "phone": "string",
+  "address": "string",
+  "source": "string"
+}
+```
+
+**LeadUpdate** (PATCH):
+
+```json
+{
+  "name": "string", // opcional
+  "last_name": "string", // opcional
+  "phone": "string", // opcional (validación si viene)
+  "address": "string" // opcional
+}
+```
+
+---
+
+## 🚀 Setup Local Paso a Paso
+
+### 1. Clonar y crear entorno virtual
+
+```bash
+git clone https://github.com/tu-usuario/karmabox-bot.git
+cd karmabox-bot
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# Windows: venv\Scripts\activate
+```
+
+### 2. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configurar variables de entorno
+
+```bash
+cp .env.example .env
+# Editar .env con tus valores reales
+```
+
+### 4. Ejecutar servidor
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+### 5. Verificar funcionamiento
 
 ```bash
 curl http://localhost:8000/health
+# Respuesta: {"status":"ok"}
 ```
 
-**Response:**
+La UI está disponible en: `http://localhost:8000/ui/` (la raíz `/` redirige automáticamente)
 
-```json
-{ "status": "ok" }
-```
+---
 
-### Listar Leads
+## 📊 Google Sheets Setup
+
+### 1. Crear Spreadsheet
+
+1. Ve a [sheets.google.com](https://sheets.google.com/)
+2. Crea un nuevo spreadsheet llamado **exactamente**: `KarmaBox Leads`
+3. En la primera fila, escribe estos headers **EXACTAMENTE** (orden y nombre):
+
+| A   | B          | C    | D         | E     | F       | G      |
+| --- | ---------- | ---- | --------- | ----- | ------- | ------ |
+| id  | created_at | name | last_name | phone | address | source |
+
+### 2. Crear Service Account
+
+1. Ve a [console.cloud.google.com](https://console.cloud.google.com/)
+2. Crea o selecciona un proyecto
+3. Habilita **Google Sheets API** y **Google Drive API**
+4. Ve a **APIs & Services → Credentials**
+5. Click **Create Credentials → Service Account**
+6. Nombre: `karmabox-sheets` (o cualquiera)
+7. Click **Done**
+8. Entra al Service Account → **Keys → Add Key → Create new key → JSON**
+9. Descarga el archivo y renómbralo a `service_account.json`
+10. Colócalo en `secrets/service_account.json`
+
+### 3. Compartir Sheet con Service Account
+
+1. Abre el JSON descargado
+2. Copia el valor de `"client_email"` (ej: `karmabox@proyecto.iam.gserviceaccount.com`)
+3. En Google Sheets, click **Compartir**
+4. Pega el email → selecciona **Editor** → **Enviar**
+
+---
+
+## 🤖 Telegram Bot
+
+### Configuración
+
+1. Crea un bot con [@BotFather](https://t.me/BotFather) y obtén el token
+2. Añade `TELEGRAM_BOT_TOKEN` a tu `.env`
+
+### Exponer webhook con ngrok
 
 ```bash
-curl http://localhost:8000/leads
+ngrok http 8000
+# Copia la URL HTTPS (ej: https://xxxx.ngrok-free.app)
 ```
 
-**Response:**
-
-```json
-[
-  {
-    "id": "abc123-...",
-    "created_at": "2025-01-27T10:30:00+00:00",
-    "name": "Juan",
-    "last_name": "García",
-    "phone": "654789012",
-    "address": "Calle Mayor 123, Madrid"
-  }
-]
-```
-
-### Crear Lead
+### Registrar webhook
 
 ```bash
-curl -X POST http://localhost:8000/leads \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "María",
-    "last_name": "López",
-    "phone": "687654321",
-    "address": "Av. Principal 45, Barcelona"
-  }'
+curl "https://api.telegram.org/bot<TU_TOKEN>/setWebhook?url=https://xxxx.ngrok-free.app/webhook/telegram"
 ```
 
-**Response (201):**
-
-```json
-{
-  "id": "uuid-generado",
-  "created_at": "2025-01-27T12:00:00+00:00",
-  "name": "María",
-  "last_name": "López",
-  "phone": "687654321",
-  "address": "Av. Principal 45, Barcelona"
-}
-```
-
-**Errores posibles:**
-
-- `409 Conflict`: Ya existe un lead con ese teléfono
-- `422 Unprocessable Entity`: Teléfono inválido (debe ser 9 dígitos de España)
-
-### Actualizar Lead (PATCH)
+### Verificar webhook
 
 ```bash
-curl -X PATCH http://localhost:8000/leads/uuid-del-lead \
-  -H "Content-Type: application/json" \
-  -d '{
-    "address": "Nueva dirección 789"
-  }'
+curl "https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo"
 ```
 
-**Response (200):**
+### Comandos disponibles
 
-```json
-{
-  "id": "uuid-del-lead",
-  "created_at": "...",
-  "name": "María",
-  "last_name": "López",
-  "phone": "687654321",
-  "address": "Nueva dirección 789"
-}
+| Comando   | Acción                                                 |
+| --------- | ------------------------------------------------------ |
+| `/start`  | Inicia flujo de registro (también: "start", "empezar") |
+| `/cancel` | Cancela flujo actual (también: "cancel")               |
+| (texto)   | Fuera del flujo: respuesta IA (si configurada)         |
+
+### Flujo de registro
+
+1. Usuario envía `/start`
+2. Bot pide: nombre → apellidos → teléfono → dirección
+3. Bot muestra resumen y pide confirmación (sí/no)
+4. Si "sí": guarda lead con `source=telegram`
+5. Si "no": cancela y permite reiniciar
+
+---
+
+## 📱 WhatsApp Cloud API
+
+### Configuración en Meta Developers
+
+1. Crea una app en [developers.facebook.com](https://developers.facebook.com/)
+2. Añade el producto **WhatsApp**
+3. Configura el webhook con:
+   - **Callback URL**: `https://tu-url-publica.com/webhook/whatsapp`
+   - **Verify Token**: el valor de `WHATSAPP_VERIFY_TOKEN` en tu `.env`
+4. **Suscríbete al campo `messages`** ← **CRÍTICO** para recibir mensajes
+
+### Variables de entorno
+
+```bash
+WHATSAPP_VERIFY_TOKEN=tu_token_de_verificacion
+WHATSAPP_ACCESS_TOKEN=tu_access_token_de_meta
+WHATSAPP_PHONE_NUMBER_ID=tu_phone_number_id
+WHATSAPP_GRAPH_VERSION=v19.0
 ```
 
-**Errores posibles:**
+### Verificación del webhook (GET)
 
-- `400 Bad Request`: No hay campos para actualizar
-- `404 Not Found`: Lead no encontrado
-- `409 Conflict`: El nuevo teléfono ya existe en otro lead
+Meta envía una petición GET con `hub.verify_token`. Si coincide con `WHATSAPP_VERIFY_TOKEN`, responde `hub.challenge`. Si no coincide, devuelve **403 Forbidden**.
+
+### Idempotencia
+
+Para evitar procesar mensajes duplicados, el sistema usa una worksheet/tab llamada `processed_messages` (configurable via `PROCESSED_MESSAGES_TAB`). Cada `message_id` procesado se guarda ahí y se ignoran duplicados.
+
+### Probar envío/recepción
+
+1. Desde WhatsApp, envía un mensaje al número de prueba de Meta
+2. Verifica en logs que llega el POST a `/webhook/whatsapp`
+3. El bot responde y marca el mensaje como leído
 
 ---
 
@@ -335,300 +307,262 @@ curl -X PATCH http://localhost:8000/leads/uuid-del-lead \
 >
 > **NO EXPONER PÚBLICAMENTE SIN PROTECCIÓN** (proxy con auth, VPN, o implementar login).
 
-La interfaz web está servida automáticamente en:
+### Acceso
 
 ```
 http://localhost:8000/ui/
 ```
 
-> **Nota:** La raíz `/` redirige automáticamente a `/ui/`
-
 ### Funcionalidades
 
-- **Listado de leads** con paginación (10/20/50 por página)
-- **Búsqueda** por nombre, apellidos, teléfono, dirección o ID
-- **Ordenación** por fecha (recientes/antiguos) o nombre (A-Z/Z-A)
-- **Panel de detalle** al seleccionar un lead
-- **Edición modal** con validación y feedback de errores
-- **Copia de ID** al portapapeles
-- **Estado de sincronización** visual (dot verde/rojo)
+| Feature           | Descripción                                       |
+| ----------------- | ------------------------------------------------- |
+| Listado           | Muestra todos los leads con paginación (10/20/50) |
+| Búsqueda          | Por nombre, apellidos, teléfono, dirección o ID   |
+| Filtro por source | WhatsApp, Telegram o todos                        |
+| Ordenación        | Por fecha (recientes/antiguos) o nombre (A-Z)     |
+| Panel detalle     | Click en lead para ver info completa              |
+| Modal edición     | Editar campos con validación y feedback           |
+| Copiar ID         | Botón para copiar UUID al portapapeles            |
 
-### Flujo de creación de leads
+### Endpoints consumidos
 
-> **Importante:** La UI es para **visualizar y editar** leads existentes, no para crearlos.
->
-> Los leads se crean a través del **bot de Telegram** o vía **API REST**.
+- `GET /leads` — Listar leads
+- `PATCH /leads/{id}` — Actualizar lead
 
----
-
-## 🤖 Telegram Bot
-
-### Cómo funciona
-
-1. El usuario inicia conversación con `/start`
-2. El bot guía paso a paso: nombre → apellidos → teléfono → dirección
-3. El usuario confirma con "sí" o "no"
-4. Si confirma, el lead se guarda en Google Sheets
-5. Fuera del flujo de registro, el bot responde con IA (si está configurada)
-
-### Configurar Webhook
-
-1. Exponer tu servidor localmente con ngrok:
-
-   ```bash
-   ngrok http 8000
-   ```
-
-2. Registrar el webhook con Telegram:
-
-   ```bash
-   curl "https://api.telegram.org/bot<TU_TOKEN>/setWebhook?url=https://xxxx.ngrok.io/webhook/telegram"
-   ```
-
-3. Verificar webhook:
-   ```bash
-   curl "https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo"
-   ```
-
-### Comandos disponibles
-
-| Comando       | Descripción                           |
-| ------------- | ------------------------------------- |
-| `/start`      | Inicia el formulario de registro      |
-| `/cancel`     | Cancela el flujo actual               |
-| (texto libre) | Respuesta IA si Groq está configurado |
+> **Nota:** La UI es para **visualizar y editar**. Los leads se crean via **bots** o **API REST**.
 
 ---
 
-## 🧠 IA con Groq (Opcional)
+## 🔐 Variables de Entorno (.env.example)
 
-El bot utiliza la API de Groq para responder preguntas cuando el usuario no está en flujo de registro.
+```bash
+# =========================
+# KarmaBox Bot - Variables
+# =========================
 
-### Activar IA
+# --- Telegram ---
+# Token del bot creado con @BotFather
+TELEGRAM_BOT_TOKEN=7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-1. Crea cuenta en [console.groq.com](https://console.groq.com/)
-2. Genera una API Key
-3. Añade a tu `.env`:
-   ```
-   GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxx
-   AI_MODEL=llama-3.3-70b-versatile
-   ```
+# --- URL pública (para webhooks) ---
+# Usar ngrok en desarrollo o URL de producción
+API_BASE_URL=https://tu-app.ngrok-free.app
 
-### Comportamiento
+# --- Google Sheets ---
+# Ruta al JSON del Service Account (NO subir a git)
+GOOGLE_SERVICE_ACCOUNT_FILE=secrets/service_account.json
 
-- **Con `GROQ_API_KEY`**: Responde preguntas sobre KarmaBox, horarios, servicios, etc.
-- **Sin `GROQ_API_KEY`**: Responde "Ahora mismo no tengo IA configurada"
+# Nombre exacto del Google Sheet
+SHEET_NAME=KarmaBox Leads
 
-### Modelo por defecto
+# Tab para idempotencia WhatsApp (default: processed_messages)
+PROCESSED_MESSAGES_TAB=processed_messages
 
-`llama-3.3-70b-versatile` — puede cambiarse vía variable `AI_MODEL`
+# --- Groq IA (Opcional) ---
+# Dejar vacío si no se usa
+GROQ_API_KEY=
+AI_MODEL=llama-3.3-70b-versatile
 
----
+# --- WhatsApp Cloud API ---
+# Token que TÚ defines para verificar el webhook
+WHATSAPP_VERIFY_TOKEN=mi_token_seguro
 
-## 📱 WhatsApp (Estado: Bloqueado)
+# Token de acceso de Meta
+WHATSAPP_ACCESS_TOKEN=EAAxxxxxxxxxxxxxxxxxx
 
-### ¿Qué está implementado?
+# Phone Number ID de tu cuenta WhatsApp Business
+WHATSAPP_PHONE_NUMBER_ID=123456789012345
 
-- **Router completo** en `bot/routers/whatsapp_webhook.py`
-- **Verificación de webhook** (GET) para Meta
-- **Recepción de mensajes** (POST) con validación de firma
-- **Envío de respuestas** via Cloud API v19.0
-- **Integración** con el mismo flujo conversacional que Telegram
-
-### ¿Por qué no funciona?
-
-> **⚠️ Bloqueo por Meta:**
->
-> Las cuentas nuevas de WhatsApp Business están sujetas a **rate limiting** severo durante el periodo sandbox. Meta requiere:
->
-> - Verificación del negocio
-> - Template de mensajes aprobados para iniciar conversaciones
-> - Periodo de "calentamiento" de la cuenta
->
-> Hasta no superar estas restricciones, los mensajes enviados pueden ser rechazados o demorados indefinidamente.
-
-### ¿Qué faltaría para completar?
-
-1. **Verificar negocio** en Meta Business Manager
-2. **Aprobar templates** de mensajes
-3. **Configurar variables**:
-   - `WHATSAPP_ACCESS_TOKEN`
-   - `WHATSAPP_PHONE_NUMBER_ID`
-   - `WHATSAPP_WABA_ID`
-4. **Probar** con número de teléfono verificado en sandbox
+# Versión de Graph API
+WHATSAPP_GRAPH_VERSION=v19.0
+```
 
 ---
 
-## ☁️ Despliegue GRATIS
+## ☁️ Despliegue en Render
 
-### Opción 1: Render.com (Recomendado)
+> El proyecto está desplegado en **Render.com** (tier gratuito).
 
-#### Pasos
+### Pasos para desplegar
 
-1. Sube tu código a GitHub (sin secrets)
-2. Ve a [render.com](https://render.com/) → New → Web Service
-3. Conecta tu repo
-4. Configura:
-   - **Build Command**: `pip install fastapi uvicorn gspread httpx python-dotenv pydantic`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+1. **Subir código a GitHub** (sin secrets ni `.env`)
+2. Ve a [render.com](https://render.com/) → **New → Web Service**
+3. Conecta tu repositorio de GitHub
+4. Configura el servicio:
 
-#### Gestión del `service_account.json`
+| Campo             | Valor                                          |
+| ----------------- | ---------------------------------------------- |
+| **Build Command** | `pip install -r requirements.txt`              |
+| **Start Command** | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 
-**Secret File (Render) — método recomendado:**
+### Configurar variables de entorno
 
-1. En Render → Environment → Secret Files
-2. Añade archivo con path `/etc/secrets/service_account.json`
-3. Configura la variable de entorno:
+En Render → **Environment**, añade todas las variables de `.env.example` con sus valores reales.
+
+### Gestión del `service_account.json`
+
+**Método recomendado: Secret Files**
+
+1. En Render → **Environment → Secret Files**
+2. Añade un archivo con path: `/etc/secrets/service_account.json`
+3. Pega el contenido del JSON
+4. Configura la variable de entorno:
    ```
    GOOGLE_SERVICE_ACCOUNT_FILE=/etc/secrets/service_account.json
    ```
 
-> **Nota:** Esta es la forma más limpia ya que el proyecto ya soporta la variable `GOOGLE_SERVICE_ACCOUNT_FILE`.
+> El proyecto ya soporta esta variable, no requiere cambios en el código.
 
-### Opción 2: Railway.app
+### Actualizar webhooks tras despliegue
 
-Similar a Render:
-
-1. Conecta repo
-2. Railway detecta Python automáticamente
-3. Configura variables de entorno en dashboard
-4. Usa secret files para `service_account.json`
-
-### Opción 3: Fly.io
+**Telegram:**
 
 ```bash
-fly launch
-fly secrets set TELEGRAM_BOT_TOKEN=xxx
-fly secrets set GOOGLE_SERVICE_ACCOUNT_JSON="$(base64 secrets/service_account.json)"
-fly deploy
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-app.onrender.com/webhook/telegram"
 ```
 
-### Webhook después del despliegue
-
-```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://tu-app.render.com/webhook/telegram"
-```
-
----
-
-## 🔒 Seguridad y Buenas Prácticas
-
-### ✅ Implementado
-
-- `.gitignore` excluye:
-  - `.env` y variantes
-  - `secrets/` (excepto `.gitkeep` si existe)
-  - `**/service_account*.json`
-  - `venv/`, `__pycache__/`
-- Validación de teléfono español (9 dígitos, empieza por 6/7/8/9)
-- Detección de duplicados por teléfono
-- Escape HTML en frontend para prevenir XSS
-- Validación opcional de firma HMAC en webhook WhatsApp
-
-### ⚠️ IMPORTANTE: UI sin autenticación
-
-> **La interfaz web (`/ui/`) no tiene sistema de login.**
->
-> Si despliegas este proyecto en un servidor público, **cualquier persona podrá ver y modificar leads**.
->
-> **Antes de exponer públicamente**, implementa una de estas protecciones:
->
-> - Proxy reverso con autenticación (nginx + htpasswd)
-> - Acceso solo via VPN
-> - Implementar sistema de login en la aplicación
-
-### 📋 Recomendaciones adicionales
-
-- [ ] **Añadir autenticación a la UI (CRÍTICO si se despliega público)**
-- [ ] Implementar rate limiting en endpoints
-- [ ] Usar HTTPS en producción
-- [ ] Logging estructurado con niveles
-- [ ] Añadir tests unitarios e integración
+**WhatsApp:**
+Actualiza la Callback URL en Meta Developers con tu URL de Render.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Error: "No such file or directory: 'secrets/service_account.json'"
+### 403 Forbidden en verificación WhatsApp
 
-**Causa:** El archivo de credenciales no existe o la ruta es incorrecta.
+**Causa**: El `hub.verify_token` enviado por Meta no coincide con `WHATSAPP_VERIFY_TOKEN`.
 
-**Solución:**
+**Solución**:
+
+1. Verifica que el token en Meta Developers sea **exactamente igual** al de `.env`
+2. Reinicia el servidor después de cambiar `.env`
+
+### No llegan mensajes WhatsApp (POST)
+
+**Causa**: No estás suscrito al campo `messages` en el webhook de Meta.
+
+**Solución**:
+
+1. En Meta Developers → WhatsApp → Configuration
+2. En **Webhook fields**, asegúrate de que `messages` esté **suscrito** (checkbox activo)
+
+### ngrok offline / URL cambia
+
+**Causa**: ngrok genera URLs temporales que cambian al reiniciar.
+
+**Solución**:
+
+```bash
+# Cada vez que reinicies ngrok, actualiza el webhook:
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://NUEVA-URL.ngrok-free.app/webhook/telegram"
+```
+
+Para WhatsApp, actualiza la Callback URL en Meta Developers.
+
+### SpreadsheetNotFound
+
+**Causa**: El nombre del Sheet no coincide o no está compartido.
+
+**Solución**:
+
+1. Verifica que se llame exactamente `KarmaBox Leads`
+2. Comparte el Sheet con el `client_email` del Service Account como **Editor**
+
+### No such file: service_account.json
+
+**Causa**: El archivo de credenciales no existe.
+
+**Solución**:
 
 ```bash
 mkdir -p secrets
-# Coloca tu service_account.json ahí
-ls -la secrets/
+# Coloca tu service_account.json descargado de Google Cloud
+ls secrets/service_account.json
 ```
 
-### Error: "SpreadsheetNotFound"
+### 409 Conflict (teléfono duplicado)
 
-**Causa:** El nombre del Sheet no coincide exactamente o no está compartido.
+**Causa**: Ya existe un lead con ese número de teléfono.
 
-**Solución:**
+**Solución**: Usa un teléfono diferente o actualiza el lead existente via PATCH.
 
-1. Verifica que el Sheet se llame exactamente `KarmaBox Leads`
-2. Comparte el Sheet con el `client_email` del Service Account
+### 422 Unprocessable Entity (validación teléfono)
 
-### Error: "Ya existe un lead con ese teléfono" (409)
+**Causa**: El teléfono no cumple la validación española.
 
-**Causa:** Teléfono duplicado en la base de datos.
+**Requisitos**:
 
-**Solución:** Usa un teléfono diferente o actualiza el lead existente via PATCH.
+- 9 dígitos exactos (después de normalizar)
+- Debe empezar por 6, 7, 8 o 9
+- Se acepta prefijo +34 o 34 (se normaliza automáticamente)
 
-### Error: "Teléfono inválido" (422)
+### IA no responde
 
-**Causa:** El teléfono no cumple validación española.
+**Causa**: `GROQ_API_KEY` no configurada o inválida.
 
-**Requisitos:**
+**Solución**:
 
-- 9 dígitos exactos
-- Empezar por 6, 7, 8 o 9
-- Sin espacios ni guiones
-
-### Telegram no responde
-
-**Verificar:**
-
-```bash
-# Comprobar webhook
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
-
-# Debe mostrar tu URL y pending_update_count
-```
-
-### IA no responde / "falta GROQ_API_KEY"
-
-**Causa:** Variable no configurada o API Key inválida.
-
-**Solución:** Verifica `GROQ_API_KEY` en `.env` y que sea válida en console.groq.com
+1. Verifica que exista la variable en `.env`
+2. Comprueba que la API Key sea válida en [console.groq.com](https://console.groq.com/)
 
 ---
 
-## 🗺️ Roadmap / Próximos Pasos
+## ✅ Checklist de Entrega
 
-Basado en el estado actual del repositorio:
+### Código y Configuración
 
-### Corto plazo
+- [ ] Repositorio limpio (sin secrets, sin `.env` real)
+- [ ] `.gitignore` incluye: `.env`, `secrets/`, `venv/`, `__pycache__/`
+- [ ] `requirements.txt` actualizado
+- [ ] `.env.example` con todas las variables documentadas
 
-- [ ] Crear `requirements.txt` o `pyproject.toml` para dependencias
-- [ ] Añadir endpoint DELETE para eliminar leads
-- [ ] Implementar autenticación básica en UI
-- [ ] Añadir logs estructurados
+### Google Sheets
 
-### Medio plazo
+- [ ] Spreadsheet creado con nombre exacto
+- [ ] Headers correctos: `id`, `created_at`, `name`, `last_name`, `phone`, `address`, `source`
+- [ ] Service Account creado y JSON descargado
+- [ ] Sheet compartido con `client_email` como Editor
 
-- [ ] Completar integración WhatsApp (cuando Meta lo permita)
-- [ ] Añadir tests con pytest
-- [ ] Dockerizar la aplicación
-- [ ] CI/CD con GitHub Actions
+### Telegram Bot
 
-### Largo plazo
+- [ ] Bot creado con @BotFather
+- [ ] Webhook configurado
+- [ ] Flujo `/start` → registro → confirmación funciona
+- [ ] Captura/video de demostración
 
-- [ ] Migrar a base de datos real (PostgreSQL)
-- [ ] Dashboard de analíticas
-- [ ] Exportación CSV de leads
-- [ ] Webhooks salientes para integraciones
+### WhatsApp Bot
+
+- [ ] App creada en Meta Developers
+- [ ] Webhook verificado (GET responde hub.challenge)
+- [ ] Suscripción a `messages` activa
+- [ ] Recepción y respuesta de mensajes funciona
+- [ ] Idempotencia verificada (mensajes duplicados ignorados)
+- [ ] Captura/video de demostración
+
+### UI Web
+
+- [ ] Acceso via `/ui/` funciona
+- [ ] Listado de leads correcto
+- [ ] Filtro por source funciona
+- [ ] Búsqueda funciona
+- [ ] Edición via modal funciona
+- [ ] Captura de demostración
+
+### API REST
+
+- [ ] `POST /leads` crea lead (201)
+- [ ] `POST /leads` rechaza duplicado (409)
+- [ ] `POST /leads` valida teléfono (422)
+- [ ] `PATCH /leads/{id}` actualiza (200)
+- [ ] `PATCH /leads/{id}` sin campos (400)
+- [ ] `PATCH /leads/{id}` no existe (404)
+
+### Demo
+
+- [ ] README actualizado con instrucciones claras
+- [ ] Capturas o video mostrando flujo completo
+- [ ] Pruebas documentadas de cada endpoint
 
 ---
 
@@ -638,9 +572,9 @@ Proyecto desarrollado como prueba técnica. Consultar con el autor para uso come
 
 ---
 
-## 👥 Autor
+## 👤 Autor
 
-Desarrollado por **[Daniel Alcaraz López]** como parte de proceso de selección.
+Desarrollado por **Daniel Alcaraz López** como parte de proceso de selección.
 
 - GitHub: [@Dani1lopez](https://github.com/Dani1lopez)
-- LinkedIn: [Dani Alcaraz López](www.linkedin.com/in/dani-alcaraz-lópez-774aa8251)
+- LinkedIn: [Dani Alcaraz López](https://www.linkedin.com/in/dani-alcaraz-lópez-774aa8251)

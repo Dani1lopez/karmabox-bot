@@ -16,6 +16,10 @@ def normalize_lead_record(r: Dict[str, Any]) -> Dict[str, str]:
     phone_raw = r.get("phone", "")
     phone_str = str(phone_raw).strip()
     phone_norm = normalize_phone(phone_str) if phone_str else ""
+    
+    source = str(r.get("source", "")).strip().lower()
+    if not source:
+        source = "unknown"
 
     return {
         "id": str(r.get("id", "")).strip(),
@@ -24,4 +28,5 @@ def normalize_lead_record(r: Dict[str, Any]) -> Dict[str, str]:
         "last_name": str(r.get("last_name", "")).strip(),
         "phone": phone_norm,
         "address": str(r.get("address", "")).strip(),
+        "source": source
     }

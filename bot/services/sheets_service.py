@@ -61,6 +61,7 @@ def save_lead(payload: LeadCreate) -> LeadOut:
         lead.last_name,
         lead.phone,
         lead.address,
+        payload.source or "",
     ])
     return lead
 

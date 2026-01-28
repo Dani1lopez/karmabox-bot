@@ -8,6 +8,7 @@ const state = {
     page: 1,
     pageSize: 20,
     loading: false,
+    sourceFilter: "all",
 };
 
 const setDot = (mode) => {
@@ -58,6 +59,15 @@ const fmtDate = (iso) => {
     } catch {
         return iso;
     }
+};
+
+const sourcePillHtml = (source) => {
+    const s = normalize(source);
+    if (s === "whatsapp")
+        return `<span class="pill pill--source pill--whatsapp">WhatsApp</span>`;
+    if (s === "telegram")
+        return `<span class="pill pill--source pill--telegram">Telegram</span>`;
+    return `<span class="pill pill--source">—</span>`;
 };
 
 const api = {
@@ -121,6 +131,7 @@ const ui = {
         $("d_last").textContent = "—";
         $("d_phone").textContent = "—";
         $("d_address").textContent = "—";
+        $("d_source").textContent = "—";
         $("btnCopyId").disabled = true;
         $("btnOpenEdit").disabled = true;
     },
@@ -132,6 +143,7 @@ const ui = {
         $("d_last").textContent = lead.last_name || "—";
         $("d_phone").textContent = lead.phone || "—";
         $("d_address").textContent = lead.address || "—";
+        $("d_source").textContent = lead.source || "—";
 
         $("btnCopyId").disabled = !lead.id;
         $("btnOpenEdit").disabled = !lead.id;
@@ -144,10 +156,15 @@ const ui = {
         // filter
         if (q) {
             items = items.filter((l) =>
-                [l.id, l.name, l.last_name, l.phone, l.address, l.created_at].some(
+                [l.id, l.name, l.last_name, l.phone, l.address, l.created_at, l.source].some(
                     (x) => normalize(x).includes(q),
                 ),
             );
+        }
+
+        const sf = normalize(state.sourceFilter);
+        if (sf && sf !== "all") {
+            items = items.filter((l) => normalize(l.source) === sf);
         }
 
         // sort
@@ -199,6 +216,7 @@ const ui = {
           <div class="muted mono" style="margin-top:6px;">${escapeHtml((l.id || "").slice(0, 10))}…</div>
         </td>
         <td class="mono">${escapeHtml(l.phone || "—")}</td>
+        <td>${sourcePillHtml(l.source)}</td>
         <td>${escapeHtml(l.address || "—")}</td>
         <td class="mono">${escapeHtml(created)}</td>
         <td class="td-actions">
@@ -394,6 +412,12 @@ function wire() {
             Math.ceil((state.leads.length || 0) / state.pageSize),
         );
         state.page = Math.min(total, state.page + 1);
+        ui.render();
+    });
+
+    $("sourceFilter").addEventListener("change", (e) => {
+        state.sourceFilter = e.target.value;
+        state.page = 1;
         ui.render();
     });
 

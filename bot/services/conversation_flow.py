@@ -37,7 +37,7 @@ def get_session(user_id: str) -> Session:
     return _sessions.get(user_id) or reset_session(user_id)
 
 
-async def handle_message(user_id: str, text: str) -> str:
+async def handle_message(user_id: str, text: str, source: str = "unknown") -> str:
     text = (text or "").strip()
 
     # Comandos
@@ -97,6 +97,7 @@ async def handle_message(user_id: str, text: str) -> str:
 
         if t in {"si", "sí", "s", "yes", "y"}:
             try:
+                s.data["source"] = source
                 payload = LeadCreate(**s.data)
                 lead = save_lead(payload)
                 clear_session(user_id)  # 🔥 vuelve a IA fuera del flujo
