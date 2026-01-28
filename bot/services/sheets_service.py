@@ -121,3 +121,51 @@ def update_lead_by_id(lead_id: str, updates: dict) -> dict:
     updated_row = _get_ws().row_values(target_row)
     raw = {headers[i]: (updated_row[i] if i < len(updated_row) else "") for i in range(len(headers))}
     return normalize_lead_record(raw)
+
+
+PROCESSED_MESSAGES_TAB = os.getenv("PROCESSED_MESSAGES_TAB", "processed_messages")
+
+
+
+
+@lru_cache
+def _get_spreadsheet():
+    gc = gspread.service_account(filename=SERVICE_ACCOUNT_FILE)
+    return gc.open(SHEET_NAME)
+
+
+
+
+@lru_cache
+def _get_processed_ws():
+    sh = _get_spreadsheet()
+    try:
+        ws = sh.worksheet(PROCESSED_MESSAGES_TAB)
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title=PROCESSED_MESSAGES_TAB, rows=2000, cols=2)
+        ws.append_row(["message_id", "processed_at"])
+    return ws
+    # si está vacía, mete header
+    values = ws.get_all_values()
+    if not values:
+        ws.append_row(["message_id", "processed_at"])
+    return ws
+
+
+
+
+def was_message_processed(message_id: str) -> bool:
+    if not message_id:
+        return False
+    ws = _get_processed_ws()
+    col = ws.col_values(1) # 1ª columna: message_id
+    return message_id in col[1:] if col else False
+
+
+
+
+def mark_message_processed(message_id: str) -> None:
+    if not message_id:
+        return
+    ws = _get_processed_ws()
+    ws.append_row([message_id, datetime.now(timezone.utc).isoformat()])

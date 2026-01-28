@@ -4,13 +4,14 @@ import logging
 import hmac
 import hashlib
 import inspect
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import PlainTextResponse, JSONResponse
 
 from bot.services.conversation_flow import handle_message
+from bot.services.sheets_service import was_message_processed, mark_message_processed
 
 logger = logging.getLogger("whatsapp")
 
@@ -21,23 +22,17 @@ router = APIRouter(prefix="/webhook/whatsapp", tags=["whatsapp"])
 # Config
 # -----------------------------
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
-
-# Opcional pero recomendado (firma de Meta en POST)
-# Header: X-Hub-Signature-256: sha256=<hex>
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_GRAPH_VERSION = os.getenv("WHATSAPP_GRAPH_VERSION", "v19.0")
 
 
 # -----------------------------
 # Helpers
 # -----------------------------
 def verify_signature_if_configured(raw_body: bytes, signature_header: Optional[str]) -> None:
-    """
-    Si WHATSAPP_APP_SECRET está definido, valida la firma X-Hub-Signature-256.
-    Si no, no hace nada 
-    """
     if not WHATSAPP_APP_SECRET:
         return
 
@@ -56,38 +51,49 @@ def verify_signature_if_configured(raw_body: bytes, signature_header: Optional[s
 
 
 def extract_messages(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Aplana entry -> changes -> value -> messages (si existen).
-    Si llegan eventos de 'statuses' u otros, devuelve lista vacía y respondemos 200.
-    """
     out: List[Dict[str, Any]] = []
     for entry in payload.get("entry", []) or []:
         for change in entry.get("changes", []) or []:
             value = change.get("value") or {}
-            messages = value.get("messages") or []
-            for msg in messages:
+            for msg in (value.get("messages") or []):
                 out.append(msg)
     return out
 
 
-def extract_text(msg: Dict[str, Any]) -> Optional[str]:
+def extract_user_text(msg: Dict[str, Any]) -> Tuple[Optional[str], str]:
     """
-    Por ahora solo texto
+    Devuelve (texto, tipo_detectado)
+    Soporta: text, interactive (list/button), legacy button
     """
-    if msg.get("type") != "text":
-        return None
-    return (msg.get("text") or {}).get("body")
+    mtype = msg.get("type") or ""
+
+    if mtype == "text":
+        return ((msg.get("text") or {}).get("body"), "text")
+
+    if mtype == "interactive":
+        inter = msg.get("interactive") or {}
+        itype = inter.get("type") or ""
+        if itype == "button_reply":
+            br = inter.get("button_reply") or {}
+            return (br.get("title") or br.get("id"), "interactive.button_reply")
+        if itype == "list_reply":
+            lr = inter.get("list_reply") or {}
+            return (lr.get("title") or lr.get("id"), "interactive.list_reply")
+        return (None, f"interactive.{itype or 'unknown'}")
+
+    if mtype == "button":  # legacy
+        btn = msg.get("button") or {}
+        return (btn.get("text") or btn.get("payload"), "button.legacy")
+
+    return (None, mtype or "unknown")
 
 
 async def send_whatsapp_text(to_wa_id: str, text: str) -> None:
-    """
-    Envía un mensaje usando Cloud API. Si faltan tokens/phone_number_id, no falla.
-    """
     if not WHATSAPP_ACCESS_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
-        logger.warning("WHATSAPP: faltan WHATSAPP_ACCESS_TOKEN o WHATSAPP_PHONE_NUMBER_ID (no se envía nada).")
+        logger.warning("WHATSAPP: faltan credenciales (no se envía nada).")
         return
 
-    url = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/{WHATSAPP_GRAPH_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
         "Content-Type": "application/json",
@@ -104,47 +110,48 @@ async def send_whatsapp_text(to_wa_id: str, text: str) -> None:
 
     if r.status_code >= 400:
         logger.warning("WA send failed: %s %s", r.status_code, r.text)
-    else:
-        logger.info("WA send ok: %s", r.status_code)
 
 
-async def run_handle_message(wa_from: str, text: str) -> Optional[str]:
-    """
-    Ejecuta tu core handler. Soporta que sea sync o async.
-    Esperamos que devuelva un 'reply' (str) o None.
-    """
-    result = handle_message(wa_from, text)
-    if inspect.isawaitable(result):
-        result = await result
-    if result is None:
+async def mark_whatsapp_read(message_id: str) -> None:
+    if not message_id or not WHATSAPP_ACCESS_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
+        return
+
+    url = f"https://graph.facebook.com/{WHATSAPP_GRAPH_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "messaging_product": "whatsapp",
+        "status": "read",
+        "message_id": message_id,
+    }
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        await client.post(url, headers=headers, json=data)
+
+
+async def run_handle_message(sender_id: str, text: str) -> Optional[str]:
+    res: Any = handle_message(sender_id, text)  # str o coroutine
+    if inspect.isawaitable(res):
+        res = await res
+    if res is None:
         return None
-    return str(result).strip() or None
+    reply = str(res).strip()
+    return reply or None
 
 
 # -----------------------------
 # Routes
 # -----------------------------
-
-
 @router.get("")
 def verify_whatsapp_webhook(request: Request):
     qp = request.query_params
-
     mode = qp.get("hub.mode")
     token = qp.get("hub.verify_token")
     challenge = qp.get("hub.challenge")
 
-    expected = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
-
-    
-    logger.debug(
-        "WA verify: mode=%s token_ok=%s challenge_present=%s",
-        mode,
-        token == expected,
-        bool(challenge),
-    )   
-
-    if mode == "subscribe" and token == expected and challenge:
+    if mode == "subscribe" and token == WHATSAPP_VERIFY_TOKEN and challenge:
         return PlainTextResponse(content=challenge, status_code=200)
 
     raise HTTPException(status_code=403, detail="Webhook verification failed")
@@ -152,14 +159,6 @@ def verify_whatsapp_webhook(request: Request):
 
 @router.post("")
 async def whatsapp_webhook(request: Request):
-    """
-    Webhook events:
-    - (Opcional) verifica firma si WHATSAPP_APP_SECRET está configurado
-    - parsea JSON
-    - extrae mensajes
-    - llama a tu core handler
-    - intenta responder por WhatsApp si tiene credenciales
-    """
     raw = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
     verify_signature_if_configured(raw, signature)
@@ -171,19 +170,36 @@ async def whatsapp_webhook(request: Request):
 
     messages = extract_messages(payload)
     if not messages:
-        # statuses u otros eventos: respondemos ok igualmente
         return JSONResponse({"ok": True, "detail": "no messages"}, status_code=200)
 
     for msg in messages:
         wa_from = msg.get("from")
+        msg_id = msg.get("id")  # wamid...
+
         if not wa_from:
             continue
 
-        text = extract_text(msg)
-        if not text:
+        # Idempotencia persistente
+        if msg_id and was_message_processed(msg_id):
+            logger.info("WA duplicated message ignored: %s", msg_id)
+            continue
+        if msg_id:
+            mark_message_processed(msg_id)
+
+        # Mark as read (nice)
+        if msg_id:
+            await mark_whatsapp_read(msg_id)
+
+        user_text, detected = extract_user_text(msg)
+        if not user_text:
+            await send_whatsapp_text(
+                wa_from,
+                "Ahora mismo solo entiendo texto (y botones/listas). Escríbeme tu consulta o pon 'start'."
+            )
+            logger.info("WA non-text handled (%s). from=%s id=%s", detected, wa_from, msg_id)
             continue
 
-        reply = await run_handle_message(wa_from, text)
+        reply = await run_handle_message(wa_from, user_text)
         if reply:
             await send_whatsapp_text(wa_from, reply)
 
