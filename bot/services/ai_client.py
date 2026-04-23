@@ -19,7 +19,7 @@ async def ai_reply(user_text: str, history: Optional[list[dict]] = None) -> str:
         {
             "role": "system",
             "content": (
-                "Eres un asistente de KarmaBox. Responde breve y claro. "
+                "Eres un asistente de LeadFlow. Responde breve y claro. "
                 "Si el usuario quiere registrarse o dejar sus datos, dile que escriba 'start' (o /start) "
                 "para iniciar el formulario. "
                 "Si pregunta dudas (horario, servicios, precios, ubicación), contesta de forma útil."

@@ -10,7 +10,7 @@ from bot.schemas.lead import LeadCreate, LeadOut
 from bot.utils.phone import normalize_phone
 from bot.utils.lead_mapper import normalize_lead_record
 
-SHEET_NAME = os.getenv("SHEET_NAME", "KarmaBox Leads")
+SHEET_NAME = os.getenv("SHEET_NAME", "LeadFlow Leads")
 SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "secrets/service_account.json")
 
 @lru_cache

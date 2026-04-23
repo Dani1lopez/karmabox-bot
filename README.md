@@ -1,4 +1,4 @@
-# 📦 KarmaBox Bot
+# 📦 LeadFlow
 
 > **Sistema de captación de leads multicanal con FastAPI, Google Sheets, bots Telegram/WhatsApp y UI de gestión.**
 
@@ -12,7 +12,7 @@
 
 ## 📋 Descripción del Proyecto
 
-**KarmaBox Bot** es una prueba técnica que implementa un sistema completo de captación y gestión de leads mediante múltiples canales:
+**LeadFlow** es una prueba técnica que implementa un sistema completo de captación y gestión de leads mediante múltiples canales:
 
 ### Requisitos de la Prueba
 
@@ -60,7 +60,7 @@
 ### Estructura de Carpetas
 
 ```
-karmabox-bot/
+leadflow/
 ├── main.py                    # Punto de entrada FastAPI (monta /ui/, redirige / → /ui/)
 ├── requirements.txt           # Dependencias del proyecto
 ├── .env.example               # Template de variables de entorno
@@ -148,8 +148,8 @@ karmabox-bot/
 ### 1. Clonar y crear entorno virtual
 
 ```bash
-git clone https://github.com/tu-usuario/karmabox-bot.git
-cd karmabox-bot
+git clone https://github.com/tu-usuario/leadflow.git
+cd leadflow
 python3 -m venv venv
 source venv/bin/activate  # Linux/Mac
 # Windows: venv\Scripts\activate
@@ -190,7 +190,7 @@ La UI está disponible en: `http://localhost:8000/ui/` (la raíz `/` redirige au
 ### 1. Crear Spreadsheet
 
 1. Ve a [sheets.google.com](https://sheets.google.com/)
-2. Crea un nuevo spreadsheet llamado **exactamente**: `KarmaBox Leads`
+2. Crea un nuevo spreadsheet llamado **exactamente**: `LeadFlow Leads`
 3. En la primera fila, escribe estos headers **EXACTAMENTE** (orden y nombre):
 
 | A   | B          | C    | D         | E     | F       | G      |
@@ -204,7 +204,7 @@ La UI está disponible en: `http://localhost:8000/ui/` (la raíz `/` redirige au
 3. Habilita **Google Sheets API** y **Google Drive API**
 4. Ve a **APIs & Services → Credentials**
 5. Click **Create Credentials → Service Account**
-6. Nombre: `karmabox-sheets` (o cualquiera)
+6. Nombre: `leadflow-sheets` (o cualquiera)
 7. Click **Done**
 8. Entra al Service Account → **Keys → Add Key → Create new key → JSON**
 9. Descarga el archivo y renómbralo a `service_account.json`
@@ -213,7 +213,7 @@ La UI está disponible en: `http://localhost:8000/ui/` (la raíz `/` redirige au
 ### 3. Compartir Sheet con Service Account
 
 1. Abre el JSON descargado
-2. Copia el valor de `"client_email"` (ej: `karmabox@proyecto.iam.gserviceaccount.com`)
+2. Copia el valor de `"client_email"` (ej: `leadflow@proyecto.iam.gserviceaccount.com`)
 3. En Google Sheets, click **Compartir**
 4. Pega el email → selecciona **Editor** → **Enviar**
 
@@ -338,7 +338,7 @@ http://localhost:8000/ui/
 
 ```bash
 # =========================
-# KarmaBox Bot - Variables
+# LeadFlow - Variables
 # =========================
 
 # --- Telegram ---
@@ -354,7 +354,7 @@ API_BASE_URL=https://tu-app.ngrok-free.app
 GOOGLE_SERVICE_ACCOUNT_FILE=secrets/service_account.json
 
 # Nombre exacto del Google Sheet
-SHEET_NAME=KarmaBox Leads
+SHEET_NAME=LeadFlow Leads
 
 # Tab para idempotencia WhatsApp (default: processed_messages)
 PROCESSED_MESSAGES_TAB=processed_messages
@@ -466,7 +466,7 @@ Para WhatsApp, actualiza la Callback URL en Meta Developers.
 
 **Solución**:
 
-1. Verifica que se llame exactamente `KarmaBox Leads`
+1. Verifica que se llame exactamente `LeadFlow Leads`
 2. Comparte el Sheet con el `client_email` del Service Account como **Editor**
 
 ### No such file: service_account.json

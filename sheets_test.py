@@ -1,7 +1,7 @@
 import gspread
 from datetime import datetime, timezone
 
-SHEET_NAME = "KarmaBox Leads"
+SHEET_NAME = "LeadFlow Leads"
 
 gc = gspread.service_account(filename="secrets/service_account.json")
 sh = gc.open(SHEET_NAME)
